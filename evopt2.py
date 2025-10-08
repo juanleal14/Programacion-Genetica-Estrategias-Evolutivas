@@ -4,8 +4,8 @@ import time
 import random
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.model_selection import cross_validate
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import RobustScaler
 import warnings
 warnings.filterwarnings('ignore')
@@ -109,7 +109,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         self.best_trees_ = []
         self.best_fitness_ = float('inf')
         self.fitness_history_ = []
-    
+        self.best_metrics_ = {'mae': None, 'mse': None}
     def fit(self, X, y):
         """Entrena usando programación genética."""
         start_time = time.time()
@@ -141,18 +141,29 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             
             # Evaluar población
             fitness_scores = []
+            metric_scores = []
             for individual in population:
-                fitness = self._evaluate_individual(individual, X_scaled, y)
+                fitness, metrics = self._evaluate_individual(individual, X_scaled, y)
                 fitness_scores.append(fitness)
-            
+                metric_scores.append(metrics)
+
             # Actualizar mejor
             best_idx = np.argmin(fitness_scores)
             if fitness_scores[best_idx] < self.best_fitness_:
                 self.best_fitness_ = fitness_scores[best_idx]
-                self.best_trees_ = population[best_idx].copy()
+                self.best_trees_ = [tree.copy() for tree in population[best_idx]]
+                self.best_metrics_ = metric_scores[best_idx]
                 stagnation = 0
-                print(f"Gen {generation} - MEJORA! Fitness: {self.best_fitness_:.4f}")
-                print(f"  Mejor árbol: {self.best_trees_[0].to_string()}")
+                print(f"Gen {generation} - MEJORA! Fitness (MSE+penalización): {self.best_fitness_:.4f}")
+                if (
+                    self.best_metrics_['mse'] is not None
+                    and self.best_metrics_['mae'] is not None
+                    and np.isfinite(self.best_metrics_['mse'])
+                    and np.isfinite(self.best_metrics_['mae'])
+                ):
+                    print(f"  MSE: {self.best_metrics_['mse']:.4f} | MAE: {self.best_metrics_['mae']:.4f}")
+                if self.best_trees_:
+                    print(f"  Mejor árbol: {self.best_trees_[0].to_string()}")
             else:
                 stagnation += 1
             
@@ -219,14 +230,30 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             
             if generation % 50 == 0:
                 elapsed = time.time() - start_time
-                print(f"Gen {generation} | Fitness: {self.best_fitness_:.4f} | " +
+                metrics_msg = ""
+                if (
+                    self.best_metrics_['mse'] is not None
+                    and self.best_metrics_['mae'] is not None
+                    and np.isfinite(self.best_metrics_['mse'])
+                    and np.isfinite(self.best_metrics_['mae'])
+                ):
+                    metrics_msg = (f" | Mejor MSE: {self.best_metrics_['mse']:.4f}"
+                                   f" | Mejor MAE: {self.best_metrics_['mae']:.4f}")
+                print(f"Gen {generation} | Fitness: {self.best_fitness_:.4f}{metrics_msg} | " +
                       f"Tiempo: {elapsed/60:.1f}min | Estancamiento: {stagnation}")
         
         print(f"\nCompletado en {generation} generaciones")
+        if (
+            self.best_metrics_['mse'] is not None
+            and self.best_metrics_['mae'] is not None
+            and np.isfinite(self.best_metrics_['mse'])
+            and np.isfinite(self.best_metrics_['mae'])
+        ):
+            print(f"Mejor MSE: {self.best_metrics_['mse']:.4f} | Mejor MAE: {self.best_metrics_['mae']:.4f}")
         print(f"Mejores árboles encontrados:")
         for i, tree in enumerate(self.best_trees_):
             print(f"  {i+1}: {tree.to_string()}")
-        
+
         return self
     
     def transform(self, X):
@@ -293,34 +320,44 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
                     X_new = np.column_stack([X_new, new_feature])
                 except:
                     X_new = np.column_stack([X_new, np.zeros(X.shape[0])])
-            
+
             # Verificar estabilidad
             if np.any(np.abs(X_new) > 1e6) or np.any(np.std(X_new, axis=0) < 1e-10):
-                return 1e6
-            
-            # Cross-validation
+                return 1e6, {'mae': float('inf'), 'mse': float('inf')}
+
+            # Cross-validation con MAE y MSE
             model = LinearRegression()
-            cv_scores = cross_val_score(model, X_new, y, cv=3, 
-                                      scoring='neg_mean_absolute_error', n_jobs=-1)
-            
-            if np.any(np.isnan(cv_scores)):
-                return 1e6
-            
-            mae = -cv_scores.mean()
-            
+            cv_results = cross_validate(
+                model,
+                X_new,
+                y,
+                cv=3,
+                scoring={'mae': 'neg_mean_absolute_error', 'mse': 'neg_mean_squared_error'},
+                n_jobs=-1
+            )
+
+            if (np.any(np.isnan(cv_results['test_mae'])) or
+                    np.any(np.isnan(cv_results['test_mse']))):
+                return 1e6, {'mae': float('inf'), 'mse': float('inf')}
+
+            mae = -cv_results['test_mae'].mean()
+            mse = -cv_results['test_mse'].mean()
+
             # Penalización por complejidad
             complexity = sum(tree.size() for tree in trees)
             penalty = 0.001 * complexity
-            
+
+            fitness = mse + penalty
+
             # Guardar modelo si es el mejor hasta ahora
-            if mae + penalty < self.best_fitness_:
+            if fitness < self.best_fitness_:
                 model.fit(X_new, y)
                 self.model_ = model
-            
-            return mae + penalty
-            
+
+            return fitness, {'mae': mae, 'mse': mse}
+
         except:
-            return 1e6
+            return 1e6, {'mae': float('inf'), 'mse': float('inf')}
     
     def _tournament_selection(self, population, fitness_scores):
         """Selección por torneo."""
@@ -418,24 +455,29 @@ def evolutionary_feature_selection(X_train, y_train, X_test, y_test,
     
     best_fitness = float('inf')
     best_individual = None
+    best_metrics = {'mae': None, 'mse': None}
     stagnation = 0
-    
+
     for gen in range(generations):
         # Evaluar población
         fitness_scores = []
+        metric_scores = []
         for individual in population:
-            fitness = evaluate_feature_subset(individual, X_train, y_train, X_test, y_test)
+            fitness, metrics = evaluate_feature_subset(individual, X_train, y_train, X_test, y_test)
             fitness_scores.append(fitness)
-        
+            metric_scores.append(metrics)
+
         # Actualizar mejor
         current_best_idx = np.argmin(fitness_scores)
         if fitness_scores[current_best_idx] < best_fitness:
             best_fitness = fitness_scores[current_best_idx]
             best_individual = population[current_best_idx].copy()
+            best_metrics = metric_scores[current_best_idx]
             stagnation = 0
             if gen % 20 == 0 or gen < 10:
                 n_selected = np.sum(best_individual)
-                print(f"  Gen {gen}: MAE = {best_fitness:.4f} | Features: {n_selected}")
+                print(f"  Gen {gen}: MSE = {best_metrics['mse']:.4f} | MAE = {best_metrics['mae']:.4f} | "
+                      f"Features: {n_selected}")
         else:
             stagnation += 1
         
@@ -475,31 +517,32 @@ def evolutionary_feature_selection(X_train, y_train, X_test, y_test,
         population = new_population[:population_size]
     
     print(f"  Selección completada en {gen+1} generaciones")
-    return best_individual, best_fitness
+    return best_individual, best_metrics
 
 
 def evaluate_feature_subset(selection, X_train, y_train, X_test, y_test):
     """Evalúa un subconjunto de features."""
     if np.sum(selection) == 0:
-        return 1e6
-    
+        return 1e6, {'mae': float('inf'), 'mse': float('inf')}
+
     try:
         X_train_sel = X_train[:, selection]
         X_test_sel = X_test[:, selection]
-        
+
         model = LinearRegression()
         model.fit(X_train_sel, y_train)
         y_pred = model.predict(X_test_sel)
-        
+
         mae = mean_absolute_error(y_test, y_pred)
-        
+        mse = mean_squared_error(y_test, y_pred)
+
         # Penalización por muchas features
         n_features = np.sum(selection)
         penalty = 0.001 * n_features
-        
-        return mae + penalty
+
+        return mse + penalty, {'mae': mae, 'mse': mse}
     except:
-        return 1e6
+        return 1e6, {'mae': float('inf'), 'mse': float('inf')}
 
 
 def tournament_selection_fs(population, fitness_scores, tournament_size):
@@ -568,15 +611,16 @@ if __name__ == "__main__":
     
     baseline = LinearRegression()
     baseline.fit(X_train_scaled, y_train)
-    baseline_mae = mean_absolute_error(y_test, baseline.predict(X_test_scaled))
-    #baseline_r2 = r2_score(y_test, baseline.predict(X_test_scaled))
-    baseline_mse = np.mean((y_test - baseline.predict(X_test_scaled)) ** 2)
+    baseline_preds = baseline.predict(X_test_scaled)
+    baseline_mae = mean_absolute_error(y_test, baseline_preds)
+    baseline_mse = mean_squared_error(y_test, baseline_preds)
+    #baseline_r2 = r2_score(y_test, baseline_preds)
     print(f"Baseline - MAE: {baseline_mae:.4f}")#, R²: {baseline_r2:.4f}")
     print(f"Baseline - MSE: {baseline_mse:.4f}")
 
     # Programación genética
     gp_optimizer = EvolutionaryOptimizer(
-        maxtime=3600  # 60 minutos
+        maxtime=1200  # 60 minutos
     )
     
     gp_optimizer.fit(X_train, y_train)
@@ -585,55 +629,16 @@ if __name__ == "__main__":
     y_pred = gp_optimizer.predict(X_test)
     
     gp_mae = mean_absolute_error(y_test, y_pred)
+    gp_mse = mean_squared_error(y_test, y_pred)
     #gp_r2 = r2_score(y_test, y_pred)
-    gp_mse = np.mean((y_test - y_pred) ** 2)
     print(f"\nResultados:")
     print(f"Baseline: MAE={baseline_mae:.4f}")
     print(f"Baseline: MSE={baseline_mse:.4f}")
-    
-    print(f"GP:       MAE={gp_mae:.4f}")
-    print(f"Mejora:   {((baseline_mae - gp_mae) / baseline_mae * 100):+.2f}%")
-    print(f"GP:       MSE={gp_mse:.4f}")
-    print(f"Mejora:   {((baseline_mse - gp_mse) / baseline_mse * 100):+.2f}%")
 
-    # EVALUAR CADA ÁRBOL INDIVIDUALMENTE
-    #print(f"\n{'='*60}")
-    #print(f"EVALUACIÓN INDIVIDUAL DE LOS {len(gp_optimizer.best_trees_)} ÁRBOLES")
-    #print(f"{'='*60}")
-    #
-    #for i, tree in enumerate(gp_optimizer.best_trees_, 1):
-    #    try:
-    #        # Crear dataset con solo este árbol
-    #        tree_feature_train = tree.evaluate(X_train_scaled)
-    #        tree_feature_test = tree.evaluate(X_test_scaled)
-    #        
-    #        # Limpieza
-    #        tree_feature_train = np.nan_to_num(tree_feature_train, nan=0.0, posinf=100.0, neginf=-100.0)
-    #        tree_feature_test = np.nan_to_num(tree_feature_test, nan=0.0, posinf=100.0, neginf=-100.0)
-    #        tree_feature_train = np.clip(tree_feature_train, -1000, 1000)
-    #        tree_feature_test = np.clip(tree_feature_test, -1000, 1000)
-    #        
-    #        # Combinar con features originales
-    #        X_train_with_tree = np.column_stack([X_train_scaled, tree_feature_train])
-    #        X_test_with_tree = np.column_stack([X_test_scaled, tree_feature_test])
-    #        
-    #        # Entrenar modelo
-    #        tree_model = LinearRegression()
-    #        tree_model.fit(X_train_with_tree, y_train)
-    #        tree_pred = tree_model.predict(X_test_with_tree)
-    #        
-    #        tree_mae = mean_absolute_error(y_test, tree_pred)
-    #        tree_improvement = ((baseline_mae - tree_mae) / baseline_mae * 100)
-    #        
-    #        print(f"Árbol {i}: {tree.to_string()}")
-    #        print(f"  MAE: {tree_mae:.4f} | Mejora: {tree_improvement:+.2f}%")
-    #        print(f"  Tamaño: {tree.size()} nodos | Profundidad: {tree.depth()}")
-    #        print()
-    #        
-    #    except Exception as e:
-    #        print(f"Árbol {i}: {tree.to_string()}")
-    #        print(f"  ERROR: {str(e)}")
-    #        print()
+    print(f"GP:       MAE={gp_mae:.4f}")
+    print(f"Mejora MAE:   {((baseline_mae - gp_mae) / baseline_mae * 100):+.2f}%")
+    print(f"GP:       MSE={gp_mse:.4f}")
+    print(f"Mejora MSE:   {((baseline_mse - gp_mse) / baseline_mse * 100):+.2f}%")
     
     # FEATURE SELECTION EVOLUTIVA
     print(f"\n{'='*70}")
@@ -647,22 +652,31 @@ if __name__ == "__main__":
     print(f"Aplicando selección evolutiva sobre {X_train_full.shape[1]} features...")
     
     # Algoritmo evolutivo para selección de features
-    best_selection, best_fs_mae = evolutionary_feature_selection(
-        X_train_full, y_train, X_test_full, y_test, 
+    best_selection, best_fs_metrics = evolutionary_feature_selection(
+        X_train_full, y_train, X_test_full, y_test,
         population_size=30, generations=100
     )
-    
-    fs_improvement = ((baseline_mae - best_fs_mae) / baseline_mae * 100)
-    gp_vs_fs_improvement = ((gp_mae - best_fs_mae) / gp_mae * 100)
-    
+
+    best_fs_mae = best_fs_metrics['mae']
+    best_fs_mse = best_fs_metrics['mse']
+
+    fs_improvement_mae = ((baseline_mae - best_fs_mae) / baseline_mae * 100)
+    fs_improvement_mse = ((baseline_mse - best_fs_mse) / baseline_mse * 100)
+    gp_vs_fs_improvement_mae = ((gp_mae - best_fs_mae) / gp_mae * 100)
+    gp_vs_fs_improvement_mse = ((gp_mse - best_fs_mse) / gp_mse * 100)
+
     print(f"\n{'='*50}")
     print(f"RESULTADOS FINALES")
     print(f"{'='*50}")
-    print(f"Baseline (solo originales):     MAE = {baseline_mae:.4f}")
-    print(f"GP (todas las features):        MAE = {gp_mae:.4f} | Mejora: {((baseline_mae - gp_mae) / baseline_mae * 100):+.2f}%")
-    print(f"GP + Feature Selection:         MAE = {best_fs_mae:.4f} | Mejora: {fs_improvement:+.2f}%")
-    print(f"")
-    print(f"Mejora de Feature Selection sobre GP: {gp_vs_fs_improvement:+.2f}%")
+    print(f"Baseline (solo originales):     MAE = {baseline_mae:.4f} | MSE = {baseline_mse:.4f}")
+    print(f"GP (todas las features):        MAE = {gp_mae:.4f} | MSE = {gp_mse:.4f} | "
+          f"Mejora MAE: {((baseline_mae - gp_mae) / baseline_mae * 100):+.2f}% | "
+          f"Mejora MSE: {((baseline_mse - gp_mse) / baseline_mse * 100):+.2f}%")
+    print(f"GP + Feature Selection:         MAE = {best_fs_mae:.4f} | MSE = {best_fs_mse:.4f} | "
+          f"Mejora MAE: {fs_improvement_mae:+.2f}% | Mejora MSE: {fs_improvement_mse:+.2f}%")
+    print()
+    print(f"Mejora de Feature Selection sobre GP (MAE): {gp_vs_fs_improvement_mae:+.2f}%")
+    print(f"Mejora de Feature Selection sobre GP (MSE): {gp_vs_fs_improvement_mse:+.2f}%")
     
     # Mostrar features seleccionadas
     selected_indices = np.where(best_selection)[0]
