@@ -576,7 +576,7 @@ if __name__ == "__main__":
 
     # Programación genética
     gp_optimizer = EvolutionaryOptimizer(
-        maxtime=1200  # 60 minutos
+        maxtime=3600  # 60 minutos
     )
     
     gp_optimizer.fit(X_train, y_train)
