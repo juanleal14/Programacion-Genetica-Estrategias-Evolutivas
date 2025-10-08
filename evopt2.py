@@ -594,13 +594,13 @@ def mutate_fs(individual):
 
 # Ejemplo de uso
 if __name__ == "__main__":
-    df = pd.read_csv('diabetes.csv')
+    df = pd.read_csv('california.csv')
     # CASO DIABETES
-    X = df.drop('target', axis=1).values
-    y = df['target'].values
+    #X = df.drop('target', axis=1).values
+    #y = df['target'].values
     # CASO CALIFORNIA
-    #X = df.drop('MedHouseVal', axis=1).values
-    #y = df['MedHouseVal'].values
+    X = df.drop('MedHouseVal', axis=1).values
+    y = df['MedHouseVal'].values
     from sklearn.model_selection import train_test_split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
