@@ -3,7 +3,7 @@
 
 Este documento resume la estructura y el flujo principal del módulo `evopt2.py`, que implementa una cadena de Programación Genética (PG) combinada con selección evolutiva de variables para problemas de regresión.
 
-## 1. Representación de árboles GP
+## 1. Representación de árboles GP (Node)
 
 * `GPNode` define la unidad básica de un árbol de programación genética.
   * Cada nodo guarda un `value`, una lista de `children` y un `node_type` que distingue entre terminales (índices de variables o constantes) y funciones.【F:evopt2.py†L16-L77】
