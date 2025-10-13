@@ -671,123 +671,123 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
 # ============================================================================
 # MAIN - EJEMPLO DE USO Y EVALUACIÓN
 # ============================================================================
-
-if __name__ == "__main__":
-    # Cargar dataset
-    df = pd.read_csv('california.csv')
-    
-    # CASO DIABETES
-    #X = df.drop('target', axis=1).values
-    #y = df['target'].values
-    
-    # CASO CALIFORNIA (descomentar si se usa otro dataset)
-    X = df.drop('MedHouseVal', axis=1).values
-    y = df['MedHouseVal'].values
-    
-    # Split train/test
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
-    
-    print(f"\n{'='*70}")
-    print(f"EVALUACIÓN DEL SISTEMA")
-    print(f"{'='*70}")
-    print(f"Dataset: {X.shape[0]} instancias, {X.shape[1]} features")
-    print(f"Train: {X_train.shape[0]} | Test: {X_test.shape[0]}")
-    print(f"{'='*70}\n")
-    
-    # ========================================================================
-    # BASELINE: Modelo sin optimización
-    # ========================================================================
-    print(f"\n{'='*70}")
-    print(f"BASELINE (Sin Optimización)")
-    print(f"{'='*70}")
-    
-    scaler = RobustScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
-    
-    baseline = Ridge(alpha=1.0, random_state=42)
-    baseline.fit(X_train, y_train)
-    baseline_preds = baseline.predict(X_test)
-    
-    baseline_mae = mean_absolute_error(y_test, baseline_preds)
-    baseline_mse = mean_squared_error(y_test, baseline_preds)
-    
-    print(f"MAE: {baseline_mae:.4f}")
-    print(f"MSE: {baseline_mse:.4f}")
-    print(f"Features utilizadas: {X_train.shape[1]}")
-    
-    # ========================================================================
-    # OPTIMIZACIÓN CON PROGRAMACIÓN GENÉTICA + FEATURE SELECTION
-    # ========================================================================
-    print(f"\n{'='*70}")
-    print(f"OPTIMIZACIÓN EVOLUTIVA")
-    print(f"{'='*70}")
-    
-    # Crear optimizador
-    gp_optimizer = EvolutionaryOptimizer(
-        maxtime=1200,  # 20 minutos (ajusta según necesites)
-    )
-    
-    # Entrenar el optimizador (aprende transformaciones)
-    gp_optimizer.fit(X_train, y_train)
-    
-    # Transformar los datos (aplicar las transformaciones aprendidas)
-    X_train_optimized = gp_optimizer.transform(X_train)
-    X_test_optimized = gp_optimizer.transform(X_test)
-    
-    # Entrenar UN NUEVO MODELO con los datos optimizados (simula lo que hace el profesor)
-    optimized_model = Ridge(alpha=1.0, random_state=42)
-    optimized_model.fit(X_train_optimized, y_train)
-    optimized_preds = optimized_model.predict(X_test_optimized)
-    
-    optimized_mae = mean_absolute_error(y_test, optimized_preds)
-    optimized_mse = mean_squared_error(y_test, optimized_preds)
-    
-    # ========================================================================
-    # RESULTADOS FINALES
-    # ========================================================================
-    print(f"\n{'='*70}")
-    print(f"RESULTADOS FINALES")
-    print(f"{'='*70}")
-    
-    print(f"\nBaseline (sin optimización):")
-    print(f"  MAE: {baseline_mae:.4f}")
-    print(f"  MSE: {baseline_mse:.4f}")
-    print(f"  Features: {X_train.shape[1]}")
-    
-    print(f"\nCon Optimización Evolutiva:")
-    print(f"  MAE: {optimized_mae:.4f}")
-    print(f"  MSE: {optimized_mse:.4f}")
-    print(f"  Features: {X_train_optimized.shape[1]}")
-    
-    # Calcular mejoras
-    mae_improvement = ((baseline_mae - optimized_mae) / baseline_mae * 100)
-    mse_improvement = ((baseline_mse - optimized_mse) / baseline_mse * 100)
-    
-    print(f"\n{'='*70}")
-    print(f"MEJORAS OBTENIDAS")
-    print(f"{'='*70}")
-    print(f"Mejora en MAE: {mae_improvement:+.2f}%")
-    print(f"Mejora en MSE: {mse_improvement:+.2f}%")
-    
-    if gp_optimizer.feature_selection_ is not None:
-        n_selected = np.sum(gp_optimizer.feature_selection_)
-        n_total = len(gp_optimizer.feature_selection_)
-        print(f"Features seleccionadas: {n_selected}/{n_total}")
-        
-        # Mostrar cuáles features se seleccionaron
-        print(f"\nFeatures seleccionadas:")
-        selected_indices = np.where(gp_optimizer.feature_selection_)[0]
-        for idx in selected_indices:
-            if idx < X.shape[1]:
-                print(f"  X{idx} (original)")
-            else:
-                tree_idx = idx - X.shape[1]
-                if tree_idx < len(gp_optimizer.best_trees_):
-                    print(f"  {gp_optimizer.best_trees_[tree_idx].to_string()} (generada)")
-    
-    print(f"\n{'='*70}")
-    print(f"¡Evaluación completada!")
-    print(f"{'='*70}\n")
+#
+#if __name__ == "__main__":
+#    # Cargar dataset
+#    df = pd.read_csv('california.csv')
+#    
+#    # CASO DIABETES
+#    #X = df.drop('target', axis=1).values
+#    #y = df['target'].values
+#    
+#    # CASO CALIFORNIA (descomentar si se usa otro dataset)
+#    X = df.drop('MedHouseVal', axis=1).values
+#    y = df['MedHouseVal'].values
+#    
+#    # Split train/test
+#    X_train, X_test, y_train, y_test = train_test_split(
+#        X, y, test_size=0.2, random_state=42
+#    )
+#    
+#    print(f"\n{'='*70}")
+#    print(f"EVALUACIÓN DEL SISTEMA")
+#    print(f"{'='*70}")
+#    print(f"Dataset: {X.shape[0]} instancias, {X.shape[1]} features")
+#    print(f"Train: {X_train.shape[0]} | Test: {X_test.shape[0]}")
+#    print(f"{'='*70}\n")
+#    
+#    # ========================================================================
+#    # BASELINE: Modelo sin optimización
+#    # ========================================================================
+#    print(f"\n{'='*70}")
+#    print(f"BASELINE (Sin Optimización)")
+#    print(f"{'='*70}")
+#    
+#    scaler = RobustScaler()
+#    X_train_scaled = scaler.fit_transform(X_train)
+#    X_test_scaled = scaler.transform(X_test)
+#    
+#    baseline = Ridge(alpha=1.0, random_state=42)
+#    baseline.fit(X_train, y_train)
+#    baseline_preds = baseline.predict(X_test)
+#    
+#    baseline_mae = mean_absolute_error(y_test, baseline_preds)
+#    baseline_mse = mean_squared_error(y_test, baseline_preds)
+#    
+#    print(f"MAE: {baseline_mae:.4f}")
+#    print(f"MSE: {baseline_mse:.4f}")
+#    print(f"Features utilizadas: {X_train.shape[1]}")
+#    
+#    # ========================================================================
+#    # OPTIMIZACIÓN CON PROGRAMACIÓN GENÉTICA + FEATURE SELECTION
+#    # ========================================================================
+#    print(f"\n{'='*70}")
+#    print(f"OPTIMIZACIÓN EVOLUTIVA")
+#    print(f"{'='*70}")
+#    
+#    # Crear optimizador
+#    gp_optimizer = EvolutionaryOptimizer(
+#        maxtime=1200,  # 20 minutos (ajusta según necesites)
+#    )
+#    
+#    # Entrenar el optimizador (aprende transformaciones)
+#    gp_optimizer.fit(X_train, y_train)
+#    
+#    # Transformar los datos (aplicar las transformaciones aprendidas)
+#    X_train_optimized = gp_optimizer.transform(X_train)
+#    X_test_optimized = gp_optimizer.transform(X_test)
+#    
+#    # Entrenar UN NUEVO MODELO con los datos optimizados (simula lo que hace el profesor)
+#    optimized_model = Ridge(alpha=1.0, random_state=42)
+#    optimized_model.fit(X_train_optimized, y_train)
+#    optimized_preds = optimized_model.predict(X_test_optimized)
+#    
+#    optimized_mae = mean_absolute_error(y_test, optimized_preds)
+#    optimized_mse = mean_squared_error(y_test, optimized_preds)
+#    
+#    # ========================================================================
+#    # RESULTADOS FINALES
+#    # ========================================================================
+#    print(f"\n{'='*70}")
+#    print(f"RESULTADOS FINALES")
+#    print(f"{'='*70}")
+#    
+#    print(f"\nBaseline (sin optimización):")
+#    print(f"  MAE: {baseline_mae:.4f}")
+#    print(f"  MSE: {baseline_mse:.4f}")
+#    print(f"  Features: {X_train.shape[1]}")
+#    
+#    print(f"\nCon Optimización Evolutiva:")
+#    print(f"  MAE: {optimized_mae:.4f}")
+#    print(f"  MSE: {optimized_mse:.4f}")
+#    print(f"  Features: {X_train_optimized.shape[1]}")
+#    
+#    # Calcular mejoras
+#    mae_improvement = ((baseline_mae - optimized_mae) / baseline_mae * 100)
+#    mse_improvement = ((baseline_mse - optimized_mse) / baseline_mse * 100)
+#    
+#    print(f"\n{'='*70}")
+#    print(f"MEJORAS OBTENIDAS")
+#    print(f"{'='*70}")
+#    print(f"Mejora en MAE: {mae_improvement:+.2f}%")
+#    print(f"Mejora en MSE: {mse_improvement:+.2f}%")
+#    
+#    if gp_optimizer.feature_selection_ is not None:
+#        n_selected = np.sum(gp_optimizer.feature_selection_)
+#        n_total = len(gp_optimizer.feature_selection_)
+#        print(f"Features seleccionadas: {n_selected}/{n_total}")
+#        
+#        # Mostrar cuáles features se seleccionaron
+#        print(f"\nFeatures seleccionadas:")
+#        selected_indices = np.where(gp_optimizer.feature_selection_)[0]
+#        for idx in selected_indices:
+#            if idx < X.shape[1]:
+#                print(f"  X{idx} (original)")
+#            else:
+#                tree_idx = idx - X.shape[1]
+#                if tree_idx < len(gp_optimizer.best_trees_):
+#                    print(f"  {gp_optimizer.best_trees_[tree_idx].to_string()} (generada)")
+#    
+#    print(f"\n{'='*70}")
+#    print(f"¡Evaluación completada!")
+#    print(f"{'='*70}\n")
