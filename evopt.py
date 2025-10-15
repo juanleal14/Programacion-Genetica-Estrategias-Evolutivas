@@ -90,7 +90,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
     def __init__(self, maxtime=1200, population_size=100, n_features_to_create=4,
                  mutation_prob=0.2, crossover_prob=0.8, tournament_size=5,
                  max_depth=5, elite_size=0.1, apply_feature_selection=True,
-                 evaluation_model='ridge'):
+                 evaluation_model='ridge', random_state=100473223):
         self.maxtime = maxtime
         self.population_size = population_size
         self.n_features_to_create = n_features_to_create
@@ -101,6 +101,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         self.elite_size = int(population_size * elite_size)
         self.apply_feature_selection = apply_feature_selection
         self.evaluation_model = evaluation_model  # 'ridge' o 'linear'
+        self.random_state = random_state
         
         # Funciones disponibles
         self.functions = {
@@ -116,6 +117,11 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
     
     def fit(self, X, y):
         """Entrena usando programación genética y selección de features."""
+        # Fijar semilla si se especifica
+        if self.random_state is not None:
+            np.random.seed(self.random_state)
+            random.seed(self.random_state)
+        
         total_time = self.maxtime
         gp_time = total_time * 0.7  # 70% para GP
         fs_time = total_time * 0.3  # 30% para Feature Selection
