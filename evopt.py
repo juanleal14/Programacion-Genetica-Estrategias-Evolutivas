@@ -1,3 +1,4 @@
+# Imports
 import numpy as np
 import pandas as pd
 import time
@@ -7,12 +8,13 @@ from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.model_selection import cross_validate, train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import RobustScaler
+
 import warnings
 warnings.filterwarnings('ignore')
 
 
 class GPNode:
-    """Nodo de árbol de programación genética."""
+    """Creación manual de un nodo de árbol de programación genética."""
     
     def __init__(self, value, children=None, node_type='terminal'):
         self.value = value
@@ -43,8 +45,6 @@ class GPNode:
                 return np.clip(val, -100, 100) ** 2
             elif self.value == 'log':
                 return np.log(np.abs(self.children[0].evaluate(X)) + 1)
-            #elif self.value == 'abs':
-            #    return np.abs(self.children[0].evaluate(X))
             elif self.value == 'sin':
                 return np.sin(self.children[0].evaluate(X))
             elif self.value == 'cos':
@@ -100,8 +100,8 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         self.max_depth = max_depth
         self.elite_size = int(population_size * elite_size)
         self.apply_feature_selection = apply_feature_selection
-        self.evaluation_model = evaluation_model  # 'ridge' o 'linear'
-        self.random_state = random_state
+        self.evaluation_model = evaluation_model  # Ridge
+        self.random_state = random_state # Fijar semilla para reproducibilidad
         
         # Funciones disponibles
         self.functions = {
@@ -189,36 +189,11 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             else:
                 gp_early_stop += 1
             
-            # Early stopping para GP
+            # Early stopping para GP ¿Valor óptimo?
             if gp_early_stop >= 100:  # 100 generaciones sin mejora en validación
                 print(f"GP Early stopping en generación {generation}")
                 break
-            
-            # CAMBIO DE RAMA cada 200 generaciones de estancamiento
-            #if stagnation > 0 and stagnation % 200 == 0:
-            #    print(f"\n🔄 CAMBIO DE RAMA en generación {generation}")
-            #    print(f"   Estancamiento: {stagnation} generaciones")
-            #    print(f"   Diversificando población...")
-            #    
-            #    elite_size_restart = max(1, self.population_size // 5)
-            #    elite_indices = np.argsort(fitness_scores)[:elite_size_restart]
-            #    
-            #    new_population_restart = []
-            #    
-            #    for idx in elite_indices:
-            #        new_population_restart.append([tree.copy() for tree in population[idx]])
-            #    
-            #    while len(new_population_restart) < self.population_size:
-            #        new_individual = []
-            #        for _ in range(self.n_features_to_create):
-            #            depth = random.randint(3, self.max_depth + 1)
-            #            tree = self._generate_tree(max_depth=depth)
-            #            new_individual.append(tree)
-            #        new_population_restart.append(new_individual)
-            #    
-            #    population = new_population_restart
-            #    print(f"   Nueva población creada con {len(population)} individuos")
-            
+                      
             self.fitness_history_.append(self.best_fitness_)
             
             # Nueva generación basada en validación
@@ -231,9 +206,11 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             
             # Generar resto
             while len(new_population) < self.population_size:
+                # Selección por torneo
                 parent1 = self._tournament_selection(population, val_fitness)
                 parent2 = self._tournament_selection(population, val_fitness)
                 
+                # Cruce y mutación
                 if random.random() < self.crossover_prob:
                     child1, child2 = self._crossover_trees(parent1, parent2)
                 else:
@@ -249,6 +226,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             
             population = new_population[:self.population_size]
             
+            # Log cada 50 generaciones
             if generation % 50 == 0:
                 elapsed = time.time() - gp_start
                 print(f"Gen {generation} | Val: {best_val_fitness:.4f} | Train: {self.best_fitness_:.4f} | " +
@@ -277,7 +255,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             X_transformed = self._transform_without_selection(X)
             
             print(f"Aplicando selección evolutiva sobre {X_transformed.shape[1]} features...")
-            print(f"Usando cross-validation (5 folds) para más robustez...")
+            print(f"Usando cross-validation...")
             print(f"Tiempo máximo: {fs_time/60:.1f}min ({fs_time}s)")
             
             # Aplicar selección evolutiva usando CV con límite de tiempo
@@ -285,7 +263,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             self.feature_selection_, fs_metrics = self._evolutionary_feature_selection_cv(
                 X_transformed, y,
                 population_size=30,
-                max_time=fs_time  # Pasar límite de tiempo
+                max_time=fs_time  # límite de tiempo
             )
             fs_elapsed = time.time() - fs_start
             
@@ -335,7 +313,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             # Ridge con regularización adaptativa
             return Ridge(alpha=1.0, random_state=42)
         else:
-            return LinearRegression()
+            return LinearRegression() # Modelo Fallback
     def transform(self, X):
         """Transforma datos usando los mejores árboles y aplica selección de features."""
         X_transformed = self._transform_without_selection(X)
@@ -383,13 +361,13 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             if np.any(np.abs(X_new) > 1e6) or np.any(np.std(X_new, axis=0) < 1e-10):
                 return 1e6, {'mae': float('inf'), 'mse': float('inf')}
 
-            # Usar el modelo configurado (Ridge o Linear) con 5-fold CV
+            # Usar el modelo configurado con 3-fold CV
             model = self._get_evaluation_model()
             cv_results = cross_validate(
                 model,
                 X_new,
                 y,
-                cv=3,  # 5-fold para más robustez
+                cv=3,  # 3-fold CV para velocidad
                 scoring={'mae': 'neg_mean_absolute_error', 'mse': 'neg_mean_squared_error'},
                 n_jobs=-1
             )
@@ -401,9 +379,9 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             mae = -cv_results['test_mae'].mean()
             mse = -cv_results['test_mse'].mean()
 
-            complexity = sum(tree.size() for tree in trees)
+            complexity = sum(tree.size() for tree in trees) # Complejidad total (Tamaño de los árboles)
             penalty = 0.001 * complexity
-            fitness = mse + penalty
+            fitness = mse + penalty # Penalización por complejidad
 
             return fitness, {'mae': mae, 'mse': mse}
 
@@ -548,6 +526,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             # Nueva generación basada en validación
             new_population = []
             
+            # Mismo proceso que en GP...
             elite_size = max(1, population_size // 10)
             elite_indices = np.argsort(val_fitness)[:elite_size]
             for idx in elite_indices:
@@ -672,128 +651,3 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             mutated[random.randint(0, len(mutated)-1)] = True
         
         return mutated
-
-
-# ============================================================================
-# MAIN - EJEMPLO DE USO Y EVALUACIÓN
-# ============================================================================
-#
-#if __name__ == "__main__":
-#    # Cargar dataset
-#    df = pd.read_csv('california.csv')
-#    
-#    # CASO DIABETES
-#    #X = df.drop('target', axis=1).values
-#    #y = df['target'].values
-#    
-#    # CASO CALIFORNIA (descomentar si se usa otro dataset)
-#    X = df.drop('MedHouseVal', axis=1).values
-#    y = df['MedHouseVal'].values
-#    
-#    # Split train/test
-#    X_train, X_test, y_train, y_test = train_test_split(
-#        X, y, test_size=0.2, random_state=42
-#    )
-#    
-#    print(f"\n{'='*70}")
-#    print(f"EVALUACIÓN DEL SISTEMA")
-#    print(f"{'='*70}")
-#    print(f"Dataset: {X.shape[0]} instancias, {X.shape[1]} features")
-#    print(f"Train: {X_train.shape[0]} | Test: {X_test.shape[0]}")
-#    print(f"{'='*70}\n")
-#    
-#    # ========================================================================
-#    # BASELINE: Modelo sin optimización
-#    # ========================================================================
-#    print(f"\n{'='*70}")
-#    print(f"BASELINE (Sin Optimización)")
-#    print(f"{'='*70}")
-#    
-#    scaler = RobustScaler()
-#    X_train_scaled = scaler.fit_transform(X_train)
-#    X_test_scaled = scaler.transform(X_test)
-#    
-#    baseline = Ridge(alpha=1.0, random_state=42)
-#    baseline.fit(X_train, y_train)
-#    baseline_preds = baseline.predict(X_test)
-#    
-#    baseline_mae = mean_absolute_error(y_test, baseline_preds)
-#    baseline_mse = mean_squared_error(y_test, baseline_preds)
-#    
-#    print(f"MAE: {baseline_mae:.4f}")
-#    print(f"MSE: {baseline_mse:.4f}")
-#    print(f"Features utilizadas: {X_train.shape[1]}")
-#    
-#    # ========================================================================
-#    # OPTIMIZACIÓN CON PROGRAMACIÓN GENÉTICA + FEATURE SELECTION
-#    # ========================================================================
-#    print(f"\n{'='*70}")
-#    print(f"OPTIMIZACIÓN EVOLUTIVA")
-#    print(f"{'='*70}")
-#    
-#    # Crear optimizador
-#    gp_optimizer = EvolutionaryOptimizer(
-#        maxtime=1200,  # 20 minutos (ajusta según necesites)
-#    )
-#    
-#    # Entrenar el optimizador (aprende transformaciones)
-#    gp_optimizer.fit(X_train, y_train)
-#    
-#    # Transformar los datos (aplicar las transformaciones aprendidas)
-#    X_train_optimized = gp_optimizer.transform(X_train)
-#    X_test_optimized = gp_optimizer.transform(X_test)
-#    
-#    # Entrenar UN NUEVO MODELO con los datos optimizados (simula lo que hace el profesor)
-#    optimized_model = Ridge(alpha=1.0, random_state=42)
-#    optimized_model.fit(X_train_optimized, y_train)
-#    optimized_preds = optimized_model.predict(X_test_optimized)
-#    
-#    optimized_mae = mean_absolute_error(y_test, optimized_preds)
-#    optimized_mse = mean_squared_error(y_test, optimized_preds)
-#    
-#    # ========================================================================
-#    # RESULTADOS FINALES
-#    # ========================================================================
-#    print(f"\n{'='*70}")
-#    print(f"RESULTADOS FINALES")
-#    print(f"{'='*70}")
-#    
-#    print(f"\nBaseline (sin optimización):")
-#    print(f"  MAE: {baseline_mae:.4f}")
-#    print(f"  MSE: {baseline_mse:.4f}")
-#    print(f"  Features: {X_train.shape[1]}")
-#    
-#    print(f"\nCon Optimización Evolutiva:")
-#    print(f"  MAE: {optimized_mae:.4f}")
-#    print(f"  MSE: {optimized_mse:.4f}")
-#    print(f"  Features: {X_train_optimized.shape[1]}")
-#    
-#    # Calcular mejoras
-#    mae_improvement = ((baseline_mae - optimized_mae) / baseline_mae * 100)
-#    mse_improvement = ((baseline_mse - optimized_mse) / baseline_mse * 100)
-#    
-#    print(f"\n{'='*70}")
-#    print(f"MEJORAS OBTENIDAS")
-#    print(f"{'='*70}")
-#    print(f"Mejora en MAE: {mae_improvement:+.2f}%")
-#    print(f"Mejora en MSE: {mse_improvement:+.2f}%")
-#    
-#    if gp_optimizer.feature_selection_ is not None:
-#        n_selected = np.sum(gp_optimizer.feature_selection_)
-#        n_total = len(gp_optimizer.feature_selection_)
-#        print(f"Features seleccionadas: {n_selected}/{n_total}")
-#        
-#        # Mostrar cuáles features se seleccionaron
-#        print(f"\nFeatures seleccionadas:")
-#        selected_indices = np.where(gp_optimizer.feature_selection_)[0]
-#        for idx in selected_indices:
-#            if idx < X.shape[1]:
-#                print(f"  X{idx} (original)")
-#            else:
-#                tree_idx = idx - X.shape[1]
-#                if tree_idx < len(gp_optimizer.best_trees_):
-#                    print(f"  {gp_optimizer.best_trees_[tree_idx].to_string()} (generada)")
-#    
-#    print(f"\n{'='*70}")
-#    print(f"¡Evaluación completada!")
-#    print(f"{'='*70}\n")
