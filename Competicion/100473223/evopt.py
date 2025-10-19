@@ -13,7 +13,7 @@ from sklearn.preprocessing import RobustScaler
 import warnings
 warnings.filterwarnings('ignore')
 
-
+# Estructura de árboles
 class GPNode:
     """Creación manual de un nodo de árbol de programación genética."""
     
@@ -110,7 +110,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         # Funciones disponibles - REDUCIDAS PARA EVITAR OVERFITTING
         self.functions = {
             'add': 2, 'sub': 2, 'mul': 2, 'div': 2,
-            'sqrt': 1, 'square': 1, 'log': 1, 'tanh': 1
+            'sqrt': 1, 'square': 1, 'log': 1, 'tanh': 1 #sin, cos, 'sigmoid' removed
         }
         
         self.best_trees_ = []
@@ -126,7 +126,8 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         self._fs_deadline = None
         self._total_deadline = None
     
-    def _check_time_remaining(self, phase="general"):
+    # Funciones adicionales para evitar que se exceda el tiempo en medio de 1 iteración
+    def _check_time_remaining(self, phase="general"): 
         """Verifica si queda tiempo disponible para continuar."""
         current_time = time.time()
         
@@ -192,15 +193,15 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         X_scaled = self.scaler_.fit_transform(X)
         self.n_features_in_ = X.shape[1]
         
-        print(f"\n{'='*70}")
+        #print(f"\n{'='*70}")
         print(f"PROGRAMACIÓN GENÉTICA CON CONTROL ESTRICTO DE TIEMPO")
-        print(f"{'='*70}")
-        print(f"Tiempo total asignado: {self.maxtime}s ({self.maxtime/60:.1f}min)")
-        print(f"  - Programación Genética: {gp_time}s ({gp_time/60:.1f}min) - 70%")
-        print(f"  - Feature Selection: {fs_time}s ({fs_time/60:.1f}min) - 20%")
-        print(f"  - Buffer de seguridad: {buffer_time}s ({buffer_time/60:.1f}min) - 10%")
-        print(f"Población: {self.population_size} | Features a crear: {self.n_features_to_create}")
-        print(f"CV Folds: {self.cv_folds} | Profundidad máxima: {self.max_depth}")
+        #print(f"{'='*70}")
+        #print(f"Tiempo total asignado: {self.maxtime}s ({self.maxtime/60:.1f}min)")
+        #print(f"  - Programación Genética: {gp_time}s ({gp_time/60:.1f}min) - 70%")
+        #print(f"  - Feature Selection: {fs_time}s ({fs_time/60:.1f}min) - 20%")
+        #print(f"  - Buffer de seguridad: {buffer_time}s ({buffer_time/60:.1f}min) - 10%")
+        #print(f"Población: {self.population_size} | Features a crear: {self.n_features_to_create}")
+        #print(f"CV Folds: {self.cv_folds} | Profundidad máxima: {self.max_depth}")
         print(f"{'='*70}\n")
         
         # FASE 1: PROGRAMACIÓN GENÉTICA CON CONTROL ESTRICTO DE TIEMPO
@@ -212,10 +213,10 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         # Verificar si queda tiempo para Feature Selection
         if self.apply_feature_selection and self._check_time_remaining("fs"):
             remaining_fs_time = self._get_time_remaining("fs")
-            print(f"\n{'='*70}")
+            #print(f"\n{'='*70}")
             print(f"FEATURE SELECTION CON CONTROL ESTRICTO DE TIEMPO")
             print(f"{'='*70}")
-            print(f"Tiempo disponible para FS: {remaining_fs_time:.1f}s ({remaining_fs_time/60:.1f}min)")
+            #print(f"Tiempo disponible para FS: {remaining_fs_time:.1f}s ({remaining_fs_time/60:.1f}min)")
             
             success_fs = self._run_feature_selection(X, y, remaining_fs_time)
             
@@ -228,13 +229,13 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         total_elapsed = self._get_time_elapsed()
         efficiency = (total_elapsed / self.maxtime) * 100
         
-        print(f"\n{'='*70}")
+        #print(f"\n{'='*70}")
         print(f"ENTRENAMIENTO COMPLETADO")
         print(f"{'='*70}")
-        print(f"Tiempo usado: {total_elapsed:.1f}s de {self.maxtime}s ({efficiency:.1f}%)")
-        print(f"Tiempo restante: {self._get_time_remaining():.1f}s")
-        print(f"Estado: {'✓ DENTRO DEL LÍMITE' if total_elapsed < self.maxtime else '⚠️ EXCEDIDO'}")
-        print(f"{'='*70}")
+        #print(f"Tiempo usado: {total_elapsed:.1f}s de {self.maxtime}s ({efficiency:.1f}%)")
+        #print(f"Tiempo restante: {self._get_time_remaining():.1f}s")
+        #print(f"Estado: {'✓ DENTRO DEL LÍMITE' if total_elapsed < self.maxtime else '⚠️ EXCEDIDO'}")
+        #print(f"{'='*70}")
 
         return self
     
@@ -404,7 +405,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
     def _evolutionary_feature_selection_with_timeout(self, X_full, y_full, max_time):
         """Feature selection con timeout estricto."""
         n_features = X_full.shape[1]
-        population_size = 60  # Reducido para garantizar velocidad
+        population_size = 60  # ¿Valor óptimo?
         
         # Inicializar población
         population = []
@@ -548,7 +549,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             )
             
             rf_model = RandomForestRegressor(
-                n_estimators=50,
+                n_estimators=50, # ¿Valor óptimo?
                 max_depth=10,
                 random_state=42,
                 n_jobs=-1
@@ -621,7 +622,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
     def transform(self, X):
         """Transforma datos usando los mejores árboles y aplica selección de features."""
         X_transformed = self._transform_without_selection(X)
-        
+        # Primeros transformamos y luego seleccionamos features
         if self.feature_selection_ is not None:
             X_transformed = X_transformed[:, self.feature_selection_]
         
@@ -759,224 +760,3 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             mutated[random.randint(0, len(mutated)-1)] = True
         
         return mutated
-
-
-# ===============================================================================
-# EJEMPLO DE USO CON EL DATASET DE CALIFORNIA
-# ===============================================================================
-
-# Importar las funciones y librerías adicionales
-from sklearn.ensemble import AdaBoostRegressor, ExtraTreesRegressor, BaggingRegressor
-from sklearn.linear_model import Lasso, ElasticNet, BayesianRidge, HuberRegressor
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.neural_network import MLPRegressor
-from sklearn.kernel_ridge import KernelRidge
-from sklearn.base import clone
-from xgboost import XGBRegressor
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.svm import SVR
-from sklearn.linear_model import LinearRegression, Ridge
-
-# Cargar dataset
-df = pd.read_csv('california.csv')
-
-# CASO CALIFORNIA (descomentar si se usa otro dataset)
-X = df.drop('MedHouseVal', axis=1).values
-y = df['MedHouseVal'].values
-
-# Split train/test
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
-
-print(f"\n{'='*70}")
-print(f"EVALUACIÓN DEL SISTEMA CON ENSEMBLE")
-print(f"{'='*70}")
-print(f"Dataset: {X.shape[0]} instancias, {X.shape[1]} features")
-print(f"Train: {X_train.shape[0]} | Test: {X_test.shape[0]}")
-print(f"Ensemble: Ridge + RandomForest (promedio)")
-print(f"{'='*70}\n")
-
-# ========================================================================
-# BASELINE: Modelo sin optimización
-# ========================================================================
-print(f"\n{'='*70}")
-print(f"BASELINE (Sin Optimización)")
-print(f"{'='*70}")
-
-scaler = RobustScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
-
-baseline = Ridge(alpha=1.0, random_state=42)
-baseline.fit(X_train, y_train)
-baseline_preds = baseline.predict(X_test)
-
-baseline_mae = mean_absolute_error(y_test, baseline_preds)
-baseline_mse = mean_squared_error(y_test, baseline_preds)
-
-print(f"MAE: {baseline_mae:.4f}")
-print(f"MSE: {baseline_mse:.4f}")
-print(f"Features utilizadas: {X_train.shape[1]}")
-
-# ========================================================================
-# OPTIMIZACIÓN CON PROGRAMACIÓN GENÉTICA + FEATURE SELECTION + ENSEMBLE
-# ========================================================================
-print(f"\n{'='*70}")
-print(f"OPTIMIZACIÓN EVOLUTIVA CON ENSEMBLE")
-print(f"{'='*70}")
-
-# Crear optimizador con ensemble
-gp_optimizer = EvolutionaryOptimizer(
-    maxtime = 3600
-)
-
-# Entrenar el optimizador (aprende transformaciones)
-gp_optimizer.fit(X_train, y_train)
-
-# Transformar los datos (aplicar las transformaciones aprendidas)
-X_train_optimized = gp_optimizer.transform(X_train)
-X_test_optimized = gp_optimizer.transform(X_test)
-
-if gp_optimizer.feature_selection_ is not None:
-    n_selected = np.sum(gp_optimizer.feature_selection_)
-    n_total = len(gp_optimizer.feature_selection_)
-    print(f"Features seleccionadas: {n_selected}/{n_total}")
-    
-    # Mostrar cuáles features se seleccionaron
-    print(f"\nFeatures seleccionadas:")
-    selected_indices = np.where(gp_optimizer.feature_selection_)[0]
-    for idx in selected_indices:
-        if idx < X.shape[1]:
-            print(f"  X{idx} (original)")
-        else:
-            tree_idx = idx - X.shape[1]
-            if tree_idx < len(gp_optimizer.best_trees_):
-                print(f"  {gp_optimizer.best_trees_[tree_idx].to_string()} (generada)")
-                
-# Modelos adicionales para probar
-additional_models = {
-    'Ridge': Ridge(alpha=1.0, random_state=42),
-    'LinearRegression': LinearRegression(),
-    'RandomForest': RandomForestRegressor(n_jobs=-1, random_state=42),
-    'SVR': SVR(),
-    'XGBoost': XGBRegressor(n_jobs=-1, random_state=42, verbosity=0),
-    'GradientBoosting': GradientBoostingRegressor(random_state=42),
-    'Lasso': Lasso(alpha=1.0, random_state=42),
-    'ElasticNet': ElasticNet(alpha=1.0, l1_ratio=0.5, random_state=42),
-    'BayesianRidge': BayesianRidge(),
-    'HuberRegressor': HuberRegressor(),
-    'KNeighbors': KNeighborsRegressor(n_neighbors=5),
-    'DecisionTree': DecisionTreeRegressor(random_state=42),
-    'ExtraTrees': ExtraTreesRegressor(n_estimators=100, random_state=42, n_jobs=-1),
-    'AdaBoost': AdaBoostRegressor(n_estimators=100, random_state=42),
-    'Bagging': BaggingRegressor(n_estimators=100, random_state=42, n_jobs=-1),
-    'MLP': MLPRegressor(hidden_layer_sizes=(100,), max_iter=500, random_state=42),
-}
-
-print(f"\n{'='*80}")
-print("PROBANDO MODELOS ADICIONALES CON ENSEMBLE")
-print(f"{'='*80}")
-
-results = []
-
-for name, model in additional_models.items():
-    try:
-        print(f"\nProbando {name}...")
-        
-        # Baseline
-        model_baseline = clone(model)
-        model_baseline.fit(X_train, y_train)
-        baseline_preds = model_baseline.predict(X_test)
-        
-        baseline_mae = mean_absolute_error(y_test, baseline_preds)
-        baseline_mse = mean_squared_error(y_test, baseline_preds)
-        
-        # Con optimización
-        model_optimized = clone(model)
-        model_optimized.fit(X_train_optimized, y_train)
-        optimized_preds = model_optimized.predict(X_test_optimized)
-        
-        optimized_mae = mean_absolute_error(y_test, optimized_preds)
-        optimized_mse = mean_squared_error(y_test, optimized_preds)
-        
-        # Mejoras
-        mae_improvement = ((baseline_mae - optimized_mae) / baseline_mae * 100)
-        mse_improvement = ((baseline_mse - optimized_mse) / baseline_mse * 100)
-        
-        results.append({
-            'Modelo': name,
-            'MAE_Base': baseline_mae,
-            'MAE_Opt': optimized_mae,
-            'Mejora_MAE': mae_improvement,
-            'MSE_Base': baseline_mse,
-            'MSE_Opt': optimized_mse,
-            'Mejora_MSE': mse_improvement
-        })
-        
-        print(f"  MAE: {baseline_mae:.4f} → {optimized_mae:.4f} ({mae_improvement:+.2f}%)")
-        print(f"  MSE: {baseline_mse:.4f} → {optimized_mse:.4f} ({mse_improvement:+.2f}%)")
-        
-    except Exception as e:
-        print(f"  Error: {e}")
-        continue
-
-# Mostrar resumen
-print(f"\n{'='*100}")
-print("RESUMEN COMPLETO - TODOS LOS MODELOS CON ENSEMBLE")
-print(f"{'='*100}")
-
-df_results = pd.DataFrame(results)
-df_sorted = df_results.sort_values('Mejora_MSE', ascending=False)
-
-print(f"{'Modelo':<15} {'MAE Base':<10} {'MAE Opt':<10} {'Mejora MAE':<12} {'MSE Base':<10} {'MSE Opt':<10} {'Mejora MSE':<12}")
-print("-" * 100)
-
-for _, row in df_sorted.iterrows():
-    print(f"{row['Modelo']:<15} {row['MAE_Base']:<10.4f} {row['MAE_Opt']:<10.4f} "
-          f"{row['Mejora_MAE']:+<12.2f}% {row['MSE_Base']:<10.4f} {row['MSE_Opt']:<10.4f} "
-          f"{row['Mejora_MSE']:+<12.2f}%")
-
-# Estadísticas finales
-print(f"\n{'='*60}")
-print("ESTADÍSTICAS GENERALES CON ENSEMBLE")
-print(f"{'='*60}")
-print(f"Modelos que mejoraron MAE: {len(df_sorted[df_sorted['Mejora_MAE'] > 0])}/{len(df_sorted)}")
-print(f"Modelos que mejoraron MSE: {len(df_sorted[df_sorted['Mejora_MSE'] > 0])}/{len(df_sorted)}")
-print(f"Mejor mejora MAE: {df_sorted['Mejora_MAE'].max():.2f}% ({df_sorted.loc[df_sorted['Mejora_MAE'].idxmax(), 'Modelo']})")
-print(f"Mejor mejora MSE: {df_sorted['Mejora_MSE'].max():.2f}% ({df_sorted.loc[df_sorted['Mejora_MSE'].idxmax(), 'Modelo']})")
-print(f"Mejora promedio MAE: {df_sorted['Mejora_MAE'].mean():.2f}%")
-print(f"Mejora promedio MSE: {df_sorted['Mejora_MSE'].mean():.2f}%")
-print(f"Evaluación con Ensemble: Ridge + RandomForest (promedio)")
-print(f"{'='*60}")
-
-# Prueba con diferentes splits para validar robustez
-#seeds = [42, 123, 456, 789, 999]
-#results = []
-#
-#for seed in seeds:
-#    X_train, X_test, y_train, y_test = train_test_split(
-#        X, y, test_size=0.2, random_state=seed
-#    )
-#    
-#    optimizer = EvolutionaryOptimizer(maxtime=1800, random_state=seed)
-#    optimizer.fit(X_train, y_train)
-#    
-#    X_train_opt = optimizer.transform(X_train)
-#    X_test_opt = optimizer.transform(X_test)
-#    
-#    # Evaluar con RandomForest como en el validator
-#    rf = RandomForestRegressor(n_jobs=-1, random_state=42)
-#    rf.fit(X_train, y_train)
-#    baseline = mean_squared_error(y_test, rf.predict(X_test))
-#    
-#    rf.fit(X_train_opt, y_train)
-#    optimized = mean_squared_error(y_test, rf.predict(X_test_opt))
-#    
-#    metric = 1 - optimized/baseline
-#    results.append(metric)
-#    print(f"Seed {seed}: metric={metric:.4f}")
-#
-#print(f"Promedio: {np.mean(results):.4f} ± {np.std(results):.4f}")
