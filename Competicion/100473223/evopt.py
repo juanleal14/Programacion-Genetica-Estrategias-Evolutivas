@@ -43,7 +43,7 @@ class GPNode:
                 return np.sqrt(np.abs(self.children[0].evaluate(X)) + 1e-6)
             elif self.value == 'square':
                 val = self.children[0].evaluate(X)
-                return np.clip(val, -100, 100) ** 2
+                return np.clip(val, -100, 100) ** 2 # We clip the input to avoid overflow
             elif self.value == 'log':
                 return np.log(np.abs(self.children[0].evaluate(X)) + 1)
             elif self.value == 'sin':
@@ -125,8 +125,9 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         self._gp_deadline = None
         self._fs_deadline = None
         self._total_deadline = None
-    
+    ##
     # Funciones adicionales para evitar que se exceda el tiempo en medio de 1 iteración
+    ##
     def _check_time_remaining(self, phase="general"): 
         """Verifica si queda tiempo disponible para continuar."""
         current_time = time.time()
@@ -161,7 +162,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         # División del tiempo: 70% GP, 20% FS, 10% buffer de seguridad
         gp_time = self.maxtime * 0.70
         fs_time = self.maxtime * 0.20
-        buffer_time = self.maxtime * 0.10
+        buffer_time = self.maxtime * 0.10 # 'Por si acaso'
         
         # Establecer deadlines
         self._gp_deadline = self._start_time + gp_time
@@ -179,7 +180,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
             y = y.values
         
         # Asegurar que y sea 1D
-        if len(y.shape) > 1:
+        if len(y.shape) > 1: # Intento de prevenir Warning en validator.py
             y = y.ravel()
         
         # Configurar estrategia de CV consistente
@@ -192,8 +193,8 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         self.scaler_ = RobustScaler()
         X_scaled = self.scaler_.fit_transform(X)
         self.n_features_in_ = X.shape[1]
-        
-        #print(f"\n{'='*70}")
+        print("Juan Leal Aliaga - 100473223")
+        print(f"\n{'='*70}")
         print(f"PROGRAMACIÓN GENÉTICA CON CONTROL ESTRICTO DE TIEMPO")
         #print(f"{'='*70}")
         #print(f"Tiempo total asignado: {self.maxtime}s ({self.maxtime/60:.1f}min)")
@@ -208,7 +209,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
         success_gp = self._run_genetic_programming(X_scaled, y, gp_time)
         
         if not success_gp:
-            print(f"⚠️  Programación Genética interrumpida por límite de tiempo")
+            print(f"Programación Genética interrumpida por límite de tiempo")
         
         # Verificar si queda tiempo para Feature Selection
         if self.apply_feature_selection and self._check_time_remaining("fs"):
@@ -405,7 +406,7 @@ class EvolutionaryOptimizer(BaseEstimator, TransformerMixin):
     def _evolutionary_feature_selection_with_timeout(self, X_full, y_full, max_time):
         """Feature selection con timeout estricto."""
         n_features = X_full.shape[1]
-        population_size = 60  # ¿Valor óptimo?
+        population_size = 60  # ¿Valor óptimo? Difícil de balancear (Rendimiento en validator, mi benchmark, overfitting,...)
         
         # Inicializar población
         population = []

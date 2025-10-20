@@ -19,8 +19,8 @@ def benchmark (Xt, yt, Xv, yv):
     @param yv: output vector of test set.
     @return average error.
     """
-    #lm = LinearRegression()
-    lm = RandomForestRegressor(n_jobs=-1, random_state=42)
+    lm = LinearRegression()
+    #lm = RandomForestRegressor(n_jobs=-1, random_state=42)
     lm.fit(Xt, yt)
     yp = lm.predict(Xv)
     e = mean_squared_error(yv, yp)
